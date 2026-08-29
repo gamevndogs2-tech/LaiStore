@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LaiStore - Hệ Thống Bán Hàng Dạng Menu</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+</head>
+<body>
+
+  <!-- HEADER NAVBAR -->
+  <header class="navbar">
+    <div class="logo" onclick="switchPage('home', document.querySelector('.nav-link'))" style="cursor: pointer;">
+      <i class="fa-solid fa-laptop-code"></i> Lai<span>Store</span>
+    </div>
+    
+    <nav class="nav-menu">
+      <button class="nav-link active" onclick="switchPage('home', this)"><i class="fa-solid fa-house"></i> Trang Chủ</button>
+      <button class="nav-link" id="menu-merchant" onclick="switchPage('merchant', this)" style="display: none;"><i class="fa-solid fa-store"></i> Quản Lý Bán Hàng</button>
+      <button class="nav-link" id="menu-shipper" onclick="switchPage('shipper', this)" style="display: none;"><i class="fa-solid fa-truck-fast"></i> Giao Hàng (Shipper)</button>
+    </nav>
+
+    <div class="nav-auth">
+      <div id="guest-zone">
+        <button class="btn-secondary" onclick="openAuthModal('login')">Đăng Nhập</button>
+        <button class="btn-primary" onclick="openAuthModal('register')">Đăng Ký</button>
+      </div>
+
+      <div id="user-zone" style="display: none;">
+        <div class="user-dropdown">
+          <button class="user-icon-btn" onclick="toggleUserDropdown(event)">
+            <i class="fa-solid fa-circle-user"></i>
+            <span id="welcome-msg" class="user-name-text"></span>
+            <span id="cart-badge-count" class="cart-badge-icon">0</span>
+            <i class="fa-solid fa-chevron-down" style="font-size: 0.75rem;"></i>
+          </button>
+          
+          <div class="dropdown-menu" id="user-dropdown-menu">
+            <div class="dropdown-header">
+              <div class="dropdown-label">Vai trò tài khoản:</div>
+              <div class="roles-badge-container" id="user-roles-badges"></div>
+            </div>
+            <hr class="dropdown-divider">
+            
+            <button class="dropdown-item" id="drop-menu-cart" onclick="switchPage('cart')">
+              <div class="dropdown-item-left"><i class="fa-solid fa-cart-shopping"></i> Giỏ Hàng & Thanh Toán</div>
+              <span class="dropdown-cart-badge" id="cart-count">0</span>
+            </button>
+            <button class="dropdown-item" id="drop-menu-orders" onclick="switchPage('my-orders')">
+              <div class="dropdown-item-left"><i class="fa-solid fa-clock-rotate-left"></i> Đơn Hàng Của Tôi</div>
+            </button>
+            <button class="dropdown-item" onclick="switchPage('account')">
+              <div class="dropdown-item-left"><i class="fa-solid fa-user-gear"></i> Cài Đặt Tài Khoản</div>
+            </button>
+            
+            <hr class="dropdown-divider">
+            <button class="dropdown-item btn-logout" onclick="logout()">
+              <div class="dropdown-item-left"><i class="fa-solid fa-right-from-bracket"></i> Đăng Xuất</div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="container">
+
+    <!-- 1. TRANG CHỦ -->
+    <section id="page-home" class="page-section active-page">
+      <div class="page-header">
+        <h2><i class="fa-solid fa-store"></i> Cửa Hàng Sản Phẩm Công Nghệ</h2>
+        <div class="search-bar">
+          <input type="text" id="search-input" placeholder="Tìm kiếm sản phẩm..." oninput="fetchProducts()">
+          <button><i class="fa-solid fa-magnifying-glass"></i></button>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <button class="filter-btn active" onclick="filterCategory('All', this)">Tất Cả</button>
+        <button class="filter-btn" onclick="filterCategory('Laptop', this)">Laptop</button>
+        <button class="filter-btn" onclick="filterCategory('Điện thoại', this)">Điện thoại</button>
+        <button class="filter-btn" onclick="filterCategory('Phụ kiện', this)">Phụ kiện</button>
+        <button class="filter-btn" onclick="filterCategory('Linh kiện', this)">Linh kiện</button>
+      </div>
+
+      <div class="product-grid" id="product-grid"></div>
+    </section>
+
+    <!-- 2. GIỎ HÀNG -->
+    <section id="page-cart" class="page-section">
+      <h2><i class="fa-solid fa-cart-shopping"></i> Giỏ Hàng & Thanh Toán</h2>
+      <div class="cart-layout">
+        <div class="cart-box">
+          <h3>Sản Phẩm Đã Chọn</h3>
+          <div id="cart-items-list"></div>
+          <h3 class="cart-total">Tổng Tiền: <span id="cart-total-price">0</span> đ</h3>
+        </div>
+
+        <div class="checkout-box">
+          <h3>Thông Tin Giao Hàng & Thanh Toán</h3>
+          <form onsubmit="handleCheckout(event)">
+            <div class="form-group">
+              <label>Họ và Tên Người Nhận *</label>
+              <input type="text" id="checkout-name" required placeholder="Nguyễn Văn A">
+            </div>
+            <div class="form-group">
+              <label>Số Điện Thoại *</label>
+              <input type="tel" id="checkout-phone" required placeholder="0987654321">
+            </div>
+            <div class="form-group">
+              <label>Địa Chỉ Nhận Hàng *</label>
+              <input type="text" id="checkout-address" required placeholder="Số 123 Đường ABC, Quận X...">
+            </div>
+            <div class="form-group">
+              <label>Phương Thức Thanh Toán</label>
+              <select id="checkout-payment">
+                <option value="COD">Thanh toán khi nhận hàng (COD)</option>
+                <option value="BANK">Chuyển khoản Ngân hàng (QR Code)</option>
+              </select>
+            </div>
+            <button type="submit" class="btn-primary" style="width: 100%;">Xác Nhận Đặt Hàng & Thanh Toán</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. ĐƠN HÀNG CỦA TÔI -->
+    <section id="page-my-orders" class="page-section">
+      <h2><i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Đơn Hàng Của Tôi</h2>
+      <div class="dashboard-box">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Mã Đơn</th>
+              <th>Ngày Đặt</th>
+              <th>Tổng Tiền</th>
+              <th>Thanh Toán</th>
+              <th>Trạng Thái Vận Chuyển</th>
+            </tr>
+          </thead>
+          <tbody id="customer-orders-list"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 4. MERCHANT -->
+    <section id="page-merchant" class="page-section">
+      <div class="page-header">
+        <h2><i class="fa-solid fa-store"></i> Quản Lý Bài Bán & Sản Phẩm</h2>
+        <button class="btn-primary" onclick="openProductModal()"><i class="fa-solid fa-plus"></i> Đăng Sản Phẩm Mới</button>
+      </div>
+      <div class="product-grid" id="merchant-product-grid"></div>
+    </section>
+
+    <!-- 5. SHIPPER -->
+    <section id="page-shipper" class="page-section">
+      <h2><i class="fa-solid fa-truck-fast"></i> Bảng Điều Khiển Vận Chuyển</h2>
+      <div class="dashboard-box">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Mã Đơn</th>
+              <th>Khách Hàng</th>
+              <th>SĐT & Địa Chỉ</th>
+              <th>Tổng Tiền</th>
+              <th>Thanh Toán</th>
+              <th>Trạng Thái</th>
+              <th>Hành Động Shipper</th>
+            </tr>
+          </thead>
+          <tbody id="shipper-order-list"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 6. CÀI ĐẶT TÀI KHOẢN -->
+    <section id="page-account" class="page-section">
+      <h2><i class="fa-solid fa-user-gear"></i> Quản Lý Tài Khoản</h2>
+      <div class="cart-layout" style="grid-template-columns: 1fr 1fr; margin-top: 20px;">
+        <div class="cart-box">
+          <h3>Thông Tin Cá Nhân</h3>
+          <form id="profile-form" onsubmit="handleUpdateProfile(event)" style="margin-top: 15px;">
+            <div class="form-group"><label>Tên Đăng Nhập</label><input type="text" id="acc-username" disabled style="background: #f1f5f9;"></div>
+            <div class="form-group"><label>Loại Tài Khoản</label><input type="text" id="acc-role" disabled style="background: #f1f5f9;"></div>
+            <div class="form-group"><label>Địa Chỉ Email</label><input type="email" id="acc-email" placeholder="VD: user@gmail.com"></div>
+            <div class="form-group"><label>Số Điện Thoại</label><input type="tel" id="acc-phone" placeholder="VD: 0912345678"></div>
+            <button type="submit" class="btn-primary" style="width: 100%;">Lưu Thông Tin Cá Nhân</button>
+          </form>
+        </div>
+
+        <div class="checkout-box">
+          <h3>Đổi Mật Khẩu</h3>
+          <form id="password-form" onsubmit="handleChangePassword(event)" style="margin-top: 15px;">
+            <div class="form-group"><label>Mật Khẩu Hiện Tại *</label><input type="password" id="acc-current-password" required placeholder="Nhập mật khẩu cũ"></div>
+            <div class="form-group"><label>Mật Khẩu Mới *</label><input type="password" id="acc-new-password" required placeholder="Ít nhất 6 ký tự"></div>
+            <div class="form-group"><label>Xác Nhận Mật Khẩu Mới *</label><input type="password" id="acc-confirm-password" required placeholder="Nhập lại mật khẩu mới"></div>
+            <button type="submit" class="btn-primary" style="width: 100%;">Cập Nhật Mật Khẩu</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-col">
+        <div class="logo"><i class="fa-solid fa-laptop-code"></i> Lai<span>Store</span></div>
+        <p style="margin-top: 10px; color: #94a3b8; font-size: 0.9rem;">
+          CÔNG TY TNHH THƯƠNG MẠI & CÔNG NGHỆ LAISTORE VIỆT NAM<br>
+          Chuyên cung cấp các thiết bị công nghệ, laptop, điện thoại và linh kiện chính hãng.
+        </p>
+      </div>
+
+      <div class="footer-col">
+        <h4>Liên Hệ Trực Tiếp</h4>
+        <p><i class="fa-solid fa-location-dot"></i> Tầng 5, Tòa nhà LaiStore Tower, Số 88 Đường Công Nghệ, Hà Nội</p>
+        <p><i class="fa-solid fa-phone"></i> Hotline: 1900 6868</p>
+        <p><i class="fa-solid fa-envelope"></i> Email: cskh@laistore.vn</p>
+      </div>
+
+      <div class="footer-col">
+        <h4>Hỗ Trợ Khách Hàng</h4>
+        <p><i class="fa-solid fa-shield-halved"></i> Chính sách bảo hành 1 đổi 1</p>
+        <p><i class="fa-solid fa-truck"></i> Giao hàng hỏa tốc toàn quốc</p>
+      </div>
+
+      <div class="footer-col">
+        <h4>Mạng Xã Hội</h4>
+        <div class="social-links">
+          <a href="#"><i class="fa-brands fa-facebook"></i></a>
+          <a href="#"><i class="fa-brands fa-youtube"></i></a>
+          <a href="#"><i class="fa-brands fa-tiktok"></i></a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">&copy; 2026 LaiStore Vietnam. Tất cả quyền được bảo lưu.</div>
+  </footer>
+
+  <!-- MODAL AUTH -->
+  <div class="modal" id="auth-modal">
+    <div class="modal-content">
+      <span class="close-btn" onclick="closeModal('auth-modal')">&times;</span>
+      <h2 id="auth-title">Đăng Nhập</h2>
+      <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+        <input type="hidden" id="auth-mode" value="login">
+        <div class="form-group"><label>Tên Đăng Nhập</label><input type="text" id="auth-username" required placeholder="Nhập tên tài khoản"></div>
+        <div class="form-group"><label>Mật Khẩu</label><input type="password" id="auth-password" required placeholder="Nhập mật khẩu"></div>
+        <div class="form-group" id="role-select-group" style="display: none;">
+          <label style="margin-bottom: 8px;">Vai Trò Tài Khoản:</label>
+          <div style="display: flex; flex-direction: column; gap: 8px; padding-left: 5px;">
+            <label style="font-weight: normal; cursor: pointer;"><input type="checkbox" class="auth-role-cb" value="user" checked> Khách Hàng</label>
+            <label style="font-weight: normal; cursor: pointer;"><input type="checkbox" class="auth-role-cb" value="merchant"> Doanh Nghiệp / Người Bán</label>
+            <label style="font-weight: normal; cursor: pointer;"><input type="checkbox" class="auth-role-cb" value="shipper"> Shipper</label>
+          </div>
+        </div>
+        <button type="submit" class="btn-primary" style="width: 100%; margin-top: 15px;" id="auth-btn-submit">Xác Nhận</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL ĐĂNG / SỬA SẢN PHẨM (ĐÃ CHUYỂN SANG CHỌN ẢNH TỪ MÁY TÍNH) -->
+  <div class="modal" id="product-modal">
+    <div class="modal-content">
+      <span class="close-btn" onclick="closeModal('product-modal')">&times;</span>
+      <h2 id="product-modal-title">Đăng Bài Sản Phẩm Mới</h2>
+      <form onsubmit="handleProductSubmit(event)">
+        <input type="hidden" id="p-id">
+        <div class="form-group"><label>Tên Sản Phẩm *</label><input type="text" id="p-name" required placeholder="VD: Laptop Dell XPS 15"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Danh Mục</label>
+            <select id="p-category">
+              <option value="Laptop">Laptop</option>
+              <option value="Điện thoại">Điện thoại</option>
+              <option value="Phụ kiện">Phụ kiện</option>
+              <option value="Linh kiện">Linh kiện</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Giá Bán (VNĐ) *</label><input type="number" id="p-price" required placeholder="VD: 15000000"></div>
+        </div>
+        
+        <!-- Ô CHỌN ẢNH TỪ MÁY TÍNH & XEM TRƯỚC -->
+        <div class="form-group">
+          <label>Hình Ảnh Sản Phẩm (Chọn từ máy tính)</label>
+          <input type="file" id="p-image-file" accept="image/*" onchange="previewImageFile(event)">
+          <input type="hidden" id="p-image-base64"> <!-- Lưu chuỗi base64 -->
+          
+          <div id="image-preview-box" style="margin-top: 10px; display: none; text-align: center;">
+            <img id="image-preview-img" src="" alt="Preview" style="max-width: 100%; max-height: 180px; border-radius: 8px; border: 1px solid #e2e8f0;">
+          </div>
+        </div>
+
+        <div class="form-group"><label>Mô Tả Cấu Hình</label><textarea id="p-desc" rows="3" placeholder="Mô tả ngắn về sản phẩm..."></textarea></div>
+        <button type="submit" class="btn-primary" style="width:100%;" id="p-submit-btn">Đăng Bài Ngay</button>
+      </form>
+    </div>
+  </div>
+
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
