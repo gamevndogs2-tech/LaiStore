@@ -1,10 +1,10 @@
 <?php
 session_start();
 
-$host = 'sql305.infinityfree.com';
-$user = 'if0_42777594';
-$pass = 'NHAP_MAT_KHAU_VPANEL_CUA_BAN'; // Thay bằng Mật khẩu vPanel MySQL của bạn
-$db   = 'if0_42777594_LaiStore';
+$host = '????????';
+$user = '????????';
+$pass = '??????'; // Thay bằng Mật khẩu vPanel MySQL của bạn
+$db   = '???????';
 
 $conn = new mysqli($host, $user, $pass, $db);
 
