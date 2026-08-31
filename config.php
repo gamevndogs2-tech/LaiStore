@@ -1,26 +1,27 @@
 <?php
-// Bật session nếu chưa có
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$host = 'localhost';
-$username = 'root';     // Mặc định của XAMPP
-$password = '';         // XAMPP mặc định không có mật khẩu (để trống)
-$database = 'laistoredb'; // Tên database bạn vừa tạo ở Bước 2
+$host = 'sql305.infinityfree.com';
+$user = 'if0_42777594';
+$pass = 'KPcfSROK4DY6t'; // Mật khẩu MySQL vPanel của bạn
+$db   = 'if0_42777594_LaiStore';
 
-// Tạo kết nối MySQLi
-$conn = new mysqli($host, $username, $password, $database);
+$conn = new mysqli($host, $user, $pass, $db);
 
-// Kiểm tra kết nối
 if ($conn->connect_error) {
-    die("Kết nối cơ sở dữ liệu thất bại: " . $conn->connect_error);
+    die("Lỗi kết nối CSDL: " . $conn->connect_error);
 }
 
-// Thiết lập bảng mã tiếng Việt UTF-8
+// ÉP BẮT BUỘC KẾT NỐI SỬ DỤNG UTF-8 FULL
 $conn->set_charset("utf8mb4");
+mysqli_set_charset($conn, "utf8mb4");
+$conn->query("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'");
 
-// Hàm kiểm tra đăng nhập nhanh
+// KIỂM TRA XEM NGƯỜI DÙNG CÓ ĐANG TRUY CẬP TỪ ỨNG DỤNG ANDROID (APP) KHÔNG
+$is_app = isset($_SERVER['HTTP_USER_AGENT']) && strpos($_SERVER['HTTP_USER_AGENT'], 'LaiStoreApp') !== false;
+
 function checkLogin() {
     if (!isset($_SESSION['user_id'])) {
         header("Location: login.php");

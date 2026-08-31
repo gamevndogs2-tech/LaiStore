@@ -1,15 +1,28 @@
 </main>
 
 <!-- ========================================== -->
-<!-- CHAT WIDGET REALTIME AJAX KHÔNG RELOAD     -->
+<!-- CHAT WIDGET REALTIME DÀNH CHO KHÁCH HÀNG   -->
 <!-- ========================================== -->
 <?php if (isset($_SESSION['user_id'])): 
     $current_u = (int)$_SESSION['user_id'];
+    
+    // Tìm ID người nhận (Cửa hàng / Admin)
     $target_u = 1;
     $res_u = $conn->query("SELECT id FROM users WHERE id != $current_u ORDER BY id ASC LIMIT 1");
     if ($res_u && $r_u = $res_u->fetch_assoc()) {
         $target_u = (int)$r_u['id'];
     }
+
+    // Lấy lịch sử tin nhắn trực tiếp từ CSDL
+    $msg_query = $conn->query("SELECT * FROM messages WHERE (sender_id = $current_u AND receiver_id = $target_u) OR (sender_id = $target_u AND receiver_id = $current_u) ORDER BY id ASC");
+    $chat_list = [];
+    if ($msg_query) {
+        while ($m = $msg_query->fetch_assoc()) {
+            $chat_list[] = $m;
+        }
+    }
+
+    $auto_open = isset($_GET['open_chat']) ? true : false;
 ?>
 <div class="fixed bottom-6 right-6 z-50">
     <!-- Nút Bật Khung Chat Floating -->
@@ -18,8 +31,8 @@
     </button>
 
     <!-- Khung Nhắn Tin Floating Window -->
-    <div id="chatWidget" class="hidden absolute bottom-16 right-0 w-80 sm:w-96 bg-white rounded-3xl border border-slate-100 shadow-2xl overflow-hidden flex-col h-[480px]">
-        <!-- Header Chat -->
+    <div id="chatWidget" class="<?= $auto_open ? 'flex' : 'hidden' ?> absolute bottom-16 right-0 w-80 sm:w-96 bg-white rounded-3xl border border-slate-100 shadow-2xl overflow-hidden flex-col h-[480px]">
+        <!-- Header Chat (Mang danh tính thương hiệu chung) -->
         <div class="bg-indigo-600 text-white p-4 flex items-center justify-between">
             <div class="flex items-center gap-2">
                 <div class="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping"></div>
@@ -28,128 +41,64 @@
             <button onclick="toggleChatWidget()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
         </div>
 
-        <!-- Khung Hiển Thị Lịch Sử Tin Nhắn (Đã sửa lỗi cuộn trang & xem lại lịch sử) -->
-        <div id="chatBody" class="p-4 flex-grow overflow-y-auto space-y-3 bg-slate-50/50 flex flex-col scroll-smooth">
-            <div class="text-center text-slate-400 text-xs py-8">Đang tải tin nhắn...</div>
+        <!-- Khung Hiển Thị Lịch Sử Tin Nhắn -->
+        <div id="chatBody" class="p-4 flex-grow overflow-y-auto space-y-3 bg-slate-50/50">
+            <?php if (!empty($chat_list)): ?>
+                <?php foreach ($chat_list as $msg): ?>
+                    <?php if ((int)$msg['sender_id'] === $current_u): ?>
+                        <!-- Tin nhắn của Khách -->
+                        <div class="flex justify-end mb-2">
+                            <div class="bg-indigo-600 text-white text-xs p-3 rounded-2xl rounded-tr-none max-w-[80%] shadow-sm">
+                                <div><?= htmlspecialchars($msg['message']) ?></div>
+                                <div class="text-[9px] text-indigo-200 text-right mt-1"><?= date('H:i', strtotime($msg['created_at'])) ?></div>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <!-- Tin nhắn của Cửa hàng (LaiStore Official) -->
+                        <div class="flex justify-start mb-2">
+                            <div class="max-w-[80%]">
+                                <div class="text-[9px] text-slate-400 font-bold mb-0.5">LaiStore Official</div>
+                                <div class="bg-white border border-slate-200 text-slate-800 text-xs p-3 rounded-2xl rounded-tl-none shadow-sm">
+                                    <div><?= htmlspecialchars($msg['message']) ?></div>
+                                    <div class="text-[9px] text-slate-400 mt-1"><?= date('H:i', strtotime($msg['created_at'])) ?></div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="text-center text-slate-400 text-xs py-8">Hãy gửi tin nhắn để trao đổi trực tiếp với LaiStore Official!</div>
+            <?php endif; ?>
         </div>
 
-        <!-- Form Ngầm AJAX -->
-        <div class="p-3 bg-white border-t border-slate-100 flex gap-2">
-            <input type="hidden" id="chatReceiverId" value="<?= $target_u ?>">
-            <input type="text" id="chatInput" placeholder="Nhập câu hỏi của bạn..." autocomplete="off" class="flex-grow px-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-indigo-600 font-medium">
-            <button type="button" onclick="sendAjaxMessage()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition">
+        <!-- Form Gửi Trực Tiếp tới send_msg.php -->
+        <form action="send_msg.php" method="POST" class="p-3 bg-white border-t border-slate-100 flex gap-2">
+            <input type="hidden" name="receiver_id" value="<?= $target_u ?>">
+            <input type="text" name="msg_content" required placeholder="Nhập câu hỏi của bạn..." autocomplete="off" class="flex-grow px-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-indigo-600 font-medium">
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition">
                 <i class="fa-solid fa-paper-plane"></i>
             </button>
-        </div>
+        </form>
     </div>
 </div>
 
 <script>
-let chatInterval = null;
-
 function toggleChatWidget() {
     const widget = document.getElementById('chatWidget');
     if (!widget) return;
-
     widget.classList.toggle('hidden');
     widget.classList.toggle('flex');
-    
-    if (!widget.classList.contains('hidden')) {
-        fetchChatMessages(true); // Lần đầu mở thì cuộn xuống đáy
-        if (chatInterval) clearInterval(chatInterval);
-        // Tự động tải lại tin nhắn ngầm mỗi 2 giây
-        chatInterval = setInterval(() => fetchChatMessages(false), 2000);
-    } else {
-        if (chatInterval) clearInterval(chatInterval);
+    scrollChatToBottom();
+}
+
+function scrollChatToBottom() {
+    const chatBody = document.getElementById('chatBody');
+    if (chatBody) {
+        chatBody.scrollTop = chatBody.scrollHeight;
     }
 }
 
-function fetchChatMessages(forceScroll = false) {
-    fetch('send_msg.php?action=fetch')
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                let html = '';
-                if (data.messages && data.messages.length > 0) {
-                    data.messages.forEach(m => {
-                        if (m.is_me) {
-                            html += `<div class="flex justify-end mb-2">
-                                <div class="bg-indigo-600 text-white text-xs p-3 rounded-2xl rounded-tr-none max-w-[80%] shadow-sm">
-                                    <div>${m.message}</div>
-                                    <div class="text-[9px] text-indigo-200 text-right mt-1">${m.time}</div>
-                                </div>
-                            </div>`;
-                        } else {
-                            html += `<div class="flex justify-start mb-2">
-                                <div class="max-w-[80%]">
-                                    <div class="text-[9px] text-slate-400 font-bold mb-0.5">LaiStore Official</div>
-                                    <div class="bg-white border border-slate-200 text-slate-800 text-xs p-3 rounded-2xl rounded-tl-none shadow-sm">
-                                        <div>${m.message}</div>
-                                        <div class="text-[9px] text-slate-400 mt-1">${m.time}</div>
-                                    </div>
-                                </div>
-                            </div>`;
-                        }
-                    });
-                } else {
-                    html = '<div class="text-center text-slate-400 text-xs py-8">Hãy gửi tin nhắn để trao đổi trực tiếp với LaiStore Official!</div>';
-                }
-
-                const chatBody = document.getElementById('chatBody');
-                if (chatBody) {
-                    // Kiểm tra xem người dùng có đang đứng ở gần đáy khung chat không
-                    const isNearBottom = chatBody.scrollHeight - chatBody.scrollTop <= chatBody.clientHeight + 100;
-                    
-                    chatBody.innerHTML = html;
-
-                    // Chỉ tự động cuộn xuống dưới khi mở khung chat, vừa gửi tin, hoặc người dùng đang ở đáy
-                    if (forceScroll || isNearBottom || chatBody.scrollTop === 0) {
-                        chatBody.scrollTop = chatBody.scrollHeight;
-                    }
-                }
-            }
-        })
-        .catch(err => console.error("Lỗi tải tin nhắn:", err));
-}
-
-function sendAjaxMessage() {
-    const input = document.getElementById('chatInput');
-    const msg = input.value.trim();
-    const receiverId = document.getElementById('chatReceiverId').value;
-    if (!msg) return;
-
-    const formData = new FormData();
-    formData.append('msg_content', msg);
-    formData.append('receiver_id', receiverId);
-
-    fetch('send_msg.php?action=send', {
-        method: 'POST',
-        body: formData
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.status === 'success') {
-            input.value = '';
-            fetchChatMessages(true); // Gửi xong ép cuộn xuống đáy để thấy tin nhắn mới
-        } else {
-            alert(data.message || 'Không thể gửi tin nhắn.');
-        }
-    })
-    .catch(err => console.error("Lỗi gửi:", err));
-}
-
-// Bắt phím Enter để gửi tin nhắn nhanh
-document.addEventListener('DOMContentLoaded', function() {
-    const input = document.getElementById('chatInput');
-    if (input) {
-        input.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                sendAjaxMessage();
-            }
-        });
-    }
-});
+document.addEventListener('DOMContentLoaded', scrollChatToBottom);
 </script>
 <?php endif; ?>
 

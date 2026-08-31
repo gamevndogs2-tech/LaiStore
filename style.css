@@ -1,235 +1,243 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');[cite: 9]
 
 :root {
-  --primary: #4f46e5;
-  --primary-hover: #4338ca;
-  --bg: #f8fafc;
-  --surface: #ffffff;
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-  --border: #e2e8f0;
-  --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
-  --radius: 12px;
+  --primary: #4f46e5;[cite: 9]
+  --primary-hover: #4338ca;[cite: 9]
+  --bg: #f8fafc;[cite: 9]
+  --surface: #ffffff;[cite: 9]
+  --text-main: #0f172a;[cite: 9]
+  --text-muted: #64748b;[cite: 9]
+  --border: #e2e8f0;[cite: 9]
+  --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);[cite: 9]
+  --radius: 12px;[cite: 9]
 }
 
 body {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  background-color: var(--bg);
-  color: var(--text-main);
-  margin: 0;
-  padding: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;[cite: 9]
+  background-color: var(--bg);[cite: 9]
+  color: var(--text-main);[cite: 9]
+  margin: 0;[cite: 9]
+  padding: 0;[cite: 9]
 }
 
 .container {
-  max-width: 1200px;
-  margin: 30px auto;
-  padding: 0 20px;
+  max-width: 1200px;[cite: 9]
+  margin: 30px auto;[cite: 9]
+  padding: 0 20px;[cite: 9]
 }
 
 /* NAVBAR */
 .navbar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 16px 0;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  background: var(--surface);[cite: 9]
+  border-bottom: 1px solid var(--border);[cite: 9]
+  padding: 16px 0;[cite: 9]
+  position: sticky;[cite: 9]
+  top: 0;[cite: 9]
+  z-index: 100;[cite: 9]
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);[cite: 9]
 }
 
 .nav-flex {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
+  display: flex;[cite: 9]
+  justify-content: space-between;[cite: 9]
+  align-items: center;[cite: 9]
+  max-width: 1200px;[cite: 9]
+  margin: 0 auto;[cite: 9]
+  padding: 0 20px;[cite: 9]
 }
 
 .logo {
-  font-size: 1.6rem;
-  font-weight: 800;
-  color: var(--primary);
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  font-size: 1.6rem;[cite: 9]
+  font-weight: 800;[cite: 9]
+  color: var(--primary);[cite: 9]
+  text-decoration: none;[cite: 9]
+  display: flex;[cite: 9]
+  align-items: center;[cite: 9]
+  gap: 8px;[cite: 9]
 }
 
 .nav-links {
-  display: flex;
-  align-items: center;
-  gap: 20px;
+  display: flex;[cite: 9]
+  align-items: center;[cite: 9]
+  gap: 20px;[cite: 9]
 }
 
 .nav-links a {
-  color: var(--text-muted);
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 0.95rem;
-  transition: all 0.2s;
+  color: var(--text-muted);[cite: 9]
+  text-decoration: none;[cite: 9]
+  font-weight: 600;[cite: 9]
+  font-size: 0.95rem;[cite: 9]
+  transition: all 0.2s;[cite: 9]
 }
 
 .nav-links a:hover {
-  color: var(--primary);
+  color: var(--primary);[cite: 9]
 }
 
 .user-badge {
-  background: #e0e7ff;
-  color: var(--primary);
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  font-weight: 700;
+  background: #e0e7ff;[cite: 9]
+  color: var(--primary);[cite: 9]
+  padding: 6px 12px;[cite: 9]
+  border-radius: 20px;[cite: 9]
+  font-size: 0.85rem;[cite: 9]
+  font-weight: 700;[cite: 9]
 }
 
 /* BUTTONS */
 .btn {
-  background: var(--primary);
-  color: white !important;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.2s;
-  box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
+  background: var(--primary);[cite: 9]
+  color: white !important;[cite: 9]
+  border: none;[cite: 9]
+  padding: 10px 20px;[cite: 9]
+  border-radius: 8px;[cite: 9]
+  cursor: pointer;[cite: 9]
+  font-weight: 600;[cite: 9]
+  text-decoration: none;[cite: 9]
+  display: inline-flex;[cite: 9]
+  align-items: center;[cite: 9]
+  gap: 8px;[cite: 9]
+  transition: all 0.2s;[cite: 9]
+  box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);[cite: 9]
 }
 
 .btn:hover {
-  background: var(--primary-hover);
-  transform: translateY(-1px);
+  background: var(--primary-hover);[cite: 9]
+  transform: translateY(-1px);[cite: 9]
 }
 
 .btn-danger {
-  background: #ef4444;
-  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+  background: #ef4444;[cite: 9]
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);[cite: 9]
 }
 
 .btn-danger:hover {
-  background: #dc2626;
+  background: #dc2626;[cite: 9]
 }
 
 /* CARDS & FORMS */
 .card {
-  background: var(--surface);
-  padding: 30px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-  margin-bottom: 25px;
+  background: var(--surface);[cite: 9]
+  padding: 30px;[cite: 9]
+  border-radius: var(--radius);[cite: 9]
+  border: 1px solid var(--border);[cite: 9]
+  box-shadow: var(--shadow);[cite: 9]
+  margin-bottom: 25px;[cite: 9]
 }
 
 .form-group {
-  margin-bottom: 18px;
+  margin-bottom: 18px;[cite: 9]
 }
 
 .form-group label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 600;
-  font-size: 0.9rem;
+  display: block;[cite: 9]
+  margin-bottom: 8px;[cite: 9]
+  font-weight: 600;[cite: 9]
+  font-size: 0.9rem;[cite: 9]
 }
 
 .form-group input, .form-group select, .form-group textarea {
-  width: 100%;
-  padding: 12px 16px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-sizing: border-box;
-  font-family: inherit;
-  font-size: 0.95rem;
-  transition: border-color 0.2s;
+  width: 100%;[cite: 9]
+  padding: 12px 16px;[cite: 9]
+  border: 1px solid var(--border);[cite: 9]
+  border-radius: 8px;[cite: 9]
+  box-sizing: border-box;[cite: 9]
+  font-family: inherit;[cite: 9]
+  font-size: 0.95rem;[cite: 9]
+  transition: border-color 0.2s;[cite: 9]
 }
 
 .form-group input:focus {
-  outline: none;
-  border-color: var(--primary);
+  outline: none;[cite: 9]
+  border-color: var(--primary);[cite: 9]
 }
 
 /* PRODUCT GRID */
 .product-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 25px;
+  display: grid;[cite: 9]
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));[cite: 9]
+  gap: 25px;[cite: 9]
 }
 
 .product-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  transition: all 0.3s;
-  box-shadow: var(--shadow);
+  background: var(--surface);[cite: 9]
+  border: 1px solid var(--border);[cite: 9]
+  border-radius: var(--radius);[cite: 9]
+  overflow: hidden;[cite: 9]
+  display: flex;[cite: 9]
+  flex-direction: column;[cite: 9]
+  transition: all 0.3s;[cite: 9]
+  box-shadow: var(--shadow);[cite: 9]
 }
 
 .product-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.08);
+  transform: translateY(-5px);[cite: 9]
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.08);[cite: 9]
 }
 
 .product-img {
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
+  width: 100%;[cite: 9]
+  height: 200px;[cite: 9]
+  object-fit: cover;[cite: 9]
 }
 
 .product-info {
-  padding: 20px;
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  padding: 20px;[cite: 9]
+  flex-grow: 1;[cite: 9]
+  display: flex;[cite: 9]
+  flex-direction: column;[cite: 9]
+  justify-content: space-between;[cite: 9]
 }
 
 .product-category {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: var(--primary);
-  background: #f5f3ff;
-  padding: 4px 8px;
-  border-radius: 4px;
-  display: inline-block;
-  margin-bottom: 8px;
+  font-size: 0.75rem;[cite: 9]
+  font-weight: 700;[cite: 9]
+  text-transform: uppercase;[cite: 9]
+  color: var(--primary);[cite: 9]
+  background: #f5f3ff;[cite: 9]
+  padding: 4px 8px;[cite: 9]
+  border-radius: 4px;[cite: 9]
+  display: inline-block;[cite: 9]
+  margin-bottom: 8px;[cite: 9]
 }
 
 .product-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  margin: 0 0 10px 0;
+  font-size: 1.1rem;[cite: 9]
+  font-weight: 700;[cite: 9]
+  margin: 0 0 10px 0;[cite: 9]
 }
 
 .price {
-  color: #10b981;
-  font-weight: 800;
-  font-size: 1.25rem;
+  color: #10b981;[cite: 9]
+  font-weight: 800;[cite: 9]
+  font-size: 1.25rem;[cite: 9]
 }
 
 /* TABLES */
 table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--surface);
-  border-radius: var(--radius);
-  overflow: hidden;
-  box-shadow: var(--shadow);
+  width: 100%;[cite: 9]
+  border-collapse: collapse;[cite: 9]
+  background: var(--surface);[cite: 9]
+  border-radius: var(--radius);[cite: 9]
+  overflow: hidden;[cite: 9]
+  box-shadow: var(--shadow);[cite: 9]
 }
 
 th, td {
-  padding: 16px;
-  text-align: left;
-  border-bottom: 1px solid var(--border);
+  padding: 16px;[cite: 9]
+  text-align: left;[cite: 9]
+  border-bottom: 1px solid var(--border);[cite: 9]
 }
 
 th {
-  background: #f8fafc;
-  font-weight: 700;
-  color: var(--text-muted);
+  background: #f8fafc;[cite: 9]
+  font-weight: 700;[cite: 9]
+  color: var(--text-muted);[cite: 9]
+}
+
+/* FIX MODAL KHI XEM TRÊN MOBILE APP (TRÁNH BỊ BÓP NHỎ) */
+#productModal > div {
+  width: 95% !important;
+  max-width: 520px !important;
+  margin: auto !important;
+  box-sizing: border-box !important;
 }
