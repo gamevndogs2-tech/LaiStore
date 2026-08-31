@@ -5,7 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $host = 'sql305.infinityfree.com';
 $user = 'if0_42777594';
-$pass = 'KPcfSROK4DY6t'; // Mật khẩu MySQL vPanel của bạn
+$pass = ''; // Mật khẩu MySQL vPanel của bạn
 $db   = 'if0_42777594_LaiStore';
 
 $conn = new mysqli($host, $user, $pass, $db);
