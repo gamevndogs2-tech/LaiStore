@@ -19,18 +19,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_product'])) {
     $product_type = $_POST['product_type'] ?? 'PHYSICAL';
     $stock        = (int)($_POST['stock'] ?? 0);
     $description  = trim($_POST['description']);
-    $image_url    = trim($_POST['image_url']);
+    $new_image    = trim($_POST['image_url'] ?? ''); 
     $initial_keys = trim($_POST['initial_keys'] ?? ''); 
 
     if ($p_id > 0) {
-        $stmt = $conn->prepare("UPDATE products SET name=?, category=?, price=?, product_type=?, stock=?, description=?, image_url=? WHERE id=? AND merchant_id=?");
-        $stmt->bind_param("ssissdiii", $name, $category, $price, $product_type, $stock, $description, $image_url, $p_id, $merchant_id);
+        // CẬP NHẬT SẢN PHẨM: Chuẩn hóa kiểu dữ liệu bind_param chính xác tuyệt đối
+        if (!empty($new_image) && strlen($new_image) > 10) {
+            // Có chọn ảnh mới: Cập nhật luôn image_url
+            $stmt = $conn->prepare("UPDATE products SET name=?, category=?, price=?, product_type=?, stock=?, description=?, image_url=? WHERE id=? AND merchant_id=?");
+            $stmt->bind_param("ssisissii", $name, $category, $price, $product_type, $stock, $description, $new_image, $p_id, $merchant_id);
+        } else {
+            // Không chọn ảnh mới: Giữ nguyên ảnh cũ, không động đến cột image_url
+            $stmt = $conn->prepare("UPDATE products SET name=?, category=?, price=?, product_type=?, stock=?, description=? WHERE id=? AND merchant_id=?");
+            $stmt->bind_param("ssisīsii", $name, $category, $price, $product_type, $stock, $description, $p_id, $merchant_id);
+        }
         $stmt->execute();
         $target_product_id = $p_id;
         $alert_type = 'updated';
     } else {
+        // THÊM MỚI SẢN PHẨM
+        $img_to_save = !empty($new_image) ? $new_image : '';
         $stmt = $conn->prepare("INSERT INTO products (merchant_id, name, category, price, product_type, stock, description, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("issisiss", $merchant_id, $name, $category, $price, $product_type, $stock, $description, $image_url);
+        $stmt->bind_param("issisiss", $merchant_id, $name, $category, $price, $product_type, $stock, $description, $img_to_save);
         $stmt->execute();
         $target_product_id = $conn->insert_id;
         $alert_type = 'created';
@@ -106,11 +116,87 @@ include 'header.php';
 <div class="mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
     <div>
         <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900">Quản Lý Sản Phẩm & Tồn Kho</h2>
-        <p class="text-slate-500 text-xs sm:text-sm mt-1">Đăng bán sản phẩm vật lý (có quản lý số lượng) hoặc tự động cấp key bản quyền.</p>
+        <p class="text-slate-500 text-xs sm:text-sm mt-1">Đăng bán sản phẩm vật lý hoặc tự động cấp key bản quyền.</p>
     </div>
-    <button onclick="openModal()" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-3 rounded-2xl shadow-lg shadow-indigo-200 transition flex items-center justify-center gap-2 text-xs sm:text-sm">
-        <i class="fa-solid fa-plus"></i> Đăng Bài Sản Phẩm Mới
+    <button onclick="toggleForm()" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-3 rounded-2xl shadow-lg shadow-indigo-200 transition flex items-center justify-center gap-2 text-xs sm:text-sm">
+        <i class="fa-solid fa-plus"></i> <span id="btnToggleText">Đăng Bài Sản Phẩm Mới</span>
     </button>
+</div>
+
+<!-- ======================================================= -->
+<!-- BẢNG FORM ĐĂNG / SỬA SẢN PHẨM XỔ XUỐNG TRỰC TIẾP TRÊN TRANG -->
+<!-- ======================================================= -->
+<div id="productFormCard" class="hidden mb-8 bg-white rounded-3xl border border-indigo-100 shadow-xl p-6 sm:p-8 transition-all duration-300">
+    <div class="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+        <div>
+            <h3 id="formTitle" class="text-lg sm:text-xl font-black text-slate-900">Đăng Bài Sản Phẩm Mới</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Điền đầy đủ thông tin sản phẩm bên dưới để niêm yết lên cửa hàng.</p>
+        </div>
+        <button onclick="closeForm()" class="text-slate-400 hover:text-slate-600 text-sm font-bold bg-slate-100 px-3 py-1.5 rounded-xl flex items-center gap-1 transition">
+            <i class="fa-solid fa-xmark"></i> Đóng
+        </button>
+    </div>
+
+    <form method="POST" action="products.php" class="space-y-5">
+        <input type="hidden" name="p_id" id="p_id" value="0">
+        <input type="hidden" name="image_url" id="p_image_url" value="">
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-600 uppercase mb-1.5">Tên Sản Phẩm</label>
+                <input type="text" name="name" id="p_name" required placeholder="Nhập tên sản phẩm..." class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600 text-xs sm:text-sm bg-slate-50/50 font-medium">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-600 uppercase mb-1.5">Phân Loại Sản Phẩm</label>
+                <select name="product_type" id="p_product_type" onchange="toggleProductTypeFields()" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600 text-xs sm:text-sm bg-slate-50/50 font-bold text-slate-700">
+                    <option value="PHYSICAL">📦 Sản Phẩm Vật Lý (Giao hàng qua Shipper)</option>
+                    <option value="LICENSE_KEY">🔑 Key Bản Quyền / Kỹ Thuật Số (Tự động cấp ngay)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-600 uppercase mb-1.5">Danh Mục</label>
+                <input type="text" name="category" id="p_category" required placeholder="Phần mềm, Game..." class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600 text-xs sm:text-sm bg-slate-50/50 font-medium">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-600 uppercase mb-1.5">Giá Bán (VNĐ)</label>
+                <input type="number" name="price" id="p_price" required placeholder="0" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600 text-xs sm:text-sm bg-slate-50/50 font-bold text-emerald-600">
+            </div>
+
+            <div id="stockBox">
+                <label class="block text-xs font-bold text-slate-600 uppercase mb-1.5">Số Lượng Tồn Kho</label>
+                <input type="number" name="stock" id="p_stock" min="0" value="10" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600 text-xs sm:text-sm bg-slate-50/50 font-bold">
+            </div>
+        </div>
+
+        <div id="initialKeysBox" class="hidden">
+            <label class="block text-xs font-bold text-indigo-600 uppercase mb-1.5"><i class="fa-solid fa-key mr-1"></i> Nhập Kho Key Ban Đầu (Mỗi dòng 1 key)</label>
+            <textarea name="initial_keys" id="p_initial_keys" rows="3" placeholder="XXXXX-XXXXX-XXXXX&#10;YYYYY-YYYYY-YYYYY" class="w-full px-4 py-3 rounded-xl border border-indigo-200 focus:outline-none focus:border-indigo-600 text-xs font-mono bg-indigo-50/30"></textarea>
+        </div>
+
+        <div>
+            <label class="block text-xs font-bold text-slate-600 uppercase mb-1.5">Tải Ảnh Từ Thiết Bị (Để trống nếu giữ nguyên ảnh cũ)</label>
+            <input type="file" id="p_image_file" accept="image/*" onchange="previewFileImage(this)" class="w-full text-xs text-slate-500 file:mr-4 file:py-3 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 cursor-pointer bg-slate-50/50 rounded-xl border border-slate-200">
+            
+            <div id="imagePreviewBox" class="mt-3 hidden">
+                <img id="imagePreviewImg" src="" class="w-24 h-24 object-cover rounded-2xl border border-slate-200 shadow-sm">
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-xs font-bold text-slate-600 uppercase mb-1.5">Mô Tả Sản Phẩm</label>
+            <textarea name="description" id="p_description" rows="3" placeholder="Nhập thông tin chi tiết về sản phẩm..." class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600 text-xs sm:text-sm bg-slate-50/50 font-medium"></textarea>
+        </div>
+
+        <div class="flex gap-3 pt-2 justify-end">
+            <button type="button" onclick="closeForm()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-6 py-3 rounded-xl text-xs sm:text-sm transition">Hủy Bỏ</button>
+            <button type="submit" name="save_product" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 py-3 rounded-xl text-xs sm:text-sm shadow-lg shadow-indigo-200 transition">Lưu Sản Phẩm</button>
+        </div>
+    </form>
 </div>
 
 <!-- Danh Sách Sản Phẩm -->
@@ -141,7 +227,6 @@ include 'header.php';
                             $available_stock = $p['stock'] ?? 0;
                         }
 
-                        // Xử lý hiển thị ảnh an toàn (Base64 hoặc URL)
                         $img_src = (!empty($p['image_url']) && strlen($p['image_url']) > 10) ? $p['image_url'] : 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=500';
                     ?>
                         <tr class="hover:bg-slate-50/50 transition">
@@ -179,7 +264,6 @@ include 'header.php';
                                             <i class="fa-solid fa-key"></i> Nạp Key
                                         </button>
                                     <?php endif; ?>
-                                    <!-- Truyền JSON an toàn qua htmlspecialchars để tránh lỗi cú pháp ký tự đặc biệt -->
                                     <button onclick='editProduct(<?= htmlspecialchars(json_encode($p, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>)' class="bg-amber-50 text-amber-600 hover:bg-amber-100 px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition">
                                         <i class="fa-solid fa-pen"></i> Sửa
                                     </button>
@@ -231,74 +315,6 @@ include 'header.php';
     </div>
 </div>
 
-<!-- MODAL THÊM / SỬA SẢN PHẨM -->
-<div id="productModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-50 hidden items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div class="flex justify-between items-center mb-5 border-b border-slate-100 pb-3">
-            <h3 id="modalTitle" class="text-lg font-bold text-slate-900">Đăng Bài Sản Phẩm Mới</h3>
-            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 text-lg w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-
-        <form method="POST" action="products.php" class="space-y-4">
-            <input type="hidden" name="p_id" id="p_id" value="0">
-            <input type="hidden" name="image_url" id="p_image_url" value="">
-
-            <div>
-                <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Tên Sản Phẩm</label>
-                <input type="text" name="name" id="p_name" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600 text-xs sm:text-sm bg-slate-50/50">
-            </div>
-
-            <div>
-                <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Phân Loại Sản Phẩm</label>
-                <select name="product_type" id="p_product_type" onchange="toggleProductTypeFields()" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600 text-xs sm:text-sm bg-slate-50/50 font-bold text-slate-700">
-                    <option value="PHYSICAL">📦 Sản Phẩm Vật Lý (Giao hàng qua Shipper)</option>
-                    <option value="LICENSE_KEY">🔑 Key Bản Quyền / Kỹ Thuật Số (Tự động cấp ngay)</option>
-                </select>
-            </div>
-
-            <div id="stockBox">
-                <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Số Lượng Tồn Kho (Sản phẩm vật lý)</label>
-                <input type="number" name="stock" id="p_stock" min="0" value="10" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600 text-xs sm:text-sm bg-slate-50/50 font-bold">
-            </div>
-
-            <div id="initialKeysBox" class="hidden">
-                <label class="block text-xs font-bold text-indigo-600 uppercase mb-1"><i class="fa-solid fa-key mr-1"></i> Nhập Kho Key Ban Đầu (Mỗi dòng 1 key)</label>
-                <textarea name="initial_keys" id="p_initial_keys" rows="3" placeholder="XXXXX-XXXXX-XXXXX&#10;YYYYY-YYYYY-YYYYY" class="w-full px-4 py-3 rounded-xl border border-indigo-200 focus:outline-none focus:border-indigo-600 text-xs font-mono bg-indigo-50/30"></textarea>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Danh Mục</label>
-                    <input type="text" name="category" id="p_category" required placeholder="Phần mềm, Game..." class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600 text-xs sm:text-sm bg-slate-50/50">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Giá Bán (VNĐ)</label>
-                    <input type="number" name="price" id="p_price" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600 text-xs sm:text-sm bg-slate-50/50">
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Tải Ảnh Từ Thiết Bị</label>
-                <input type="file" id="p_image_file" accept="image/*" onchange="previewFileImage(this)" class="w-full text-xs text-slate-500 file:mr-4 file:py-3 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 cursor-pointer bg-slate-50/50 rounded-xl border border-slate-200">
-                
-                <div id="imagePreviewBox" class="mt-3 hidden">
-                    <img id="imagePreviewImg" src="" class="w-20 h-20 object-cover rounded-xl border border-slate-200 shadow-sm">
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Mô Tả Sản Phẩm</label>
-                <textarea name="description" id="p_description" rows="3" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600 text-xs sm:text-sm bg-slate-50/50"></textarea>
-            </div>
-
-            <div class="flex gap-3 pt-3">
-                <button type="button" onclick="closeModal()" class="flex-1 bg-slate-100 text-slate-600 font-bold py-3 rounded-xl text-xs sm:text-sm">Hủy</button>
-                <button type="submit" name="save_product" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-xs sm:text-sm shadow-lg shadow-indigo-200">Lưu Sản Phẩm</button>
-            </div>
-        </form>
-    </div>
-</div>
-
 <script>
 function toggleProductTypeFields() {
     const typeSelect = document.getElementById('p_product_type').value;
@@ -333,7 +349,16 @@ function previewFileImage(input) {
     }
 }
 
-function openModal() {
+function toggleForm() {
+    const card = document.getElementById('productFormCard');
+    if (card.classList.contains('hidden')) {
+        openCreateForm();
+    } else {
+        closeForm();
+    }
+}
+
+function openCreateForm() {
     document.getElementById('p_id').value = 0;
     document.getElementById('p_name').value = '';
     document.getElementById('p_category').value = '';
@@ -346,9 +371,13 @@ function openModal() {
     document.getElementById('p_description').value = '';
     document.getElementById('imagePreviewBox').classList.add('hidden');
     toggleProductTypeFields();
-    document.getElementById('modalTitle').innerText = 'Đăng Bài Sản Phẩm Mới';
-    document.getElementById('productModal').classList.remove('hidden');
-    document.getElementById('productModal').classList.add('flex');
+
+    document.getElementById('formTitle').innerText = 'Đăng Bài Sản Phẩm Mới';
+    document.getElementById('btnToggleText').innerText = 'Đóng Bảng Form';
+    
+    const card = document.getElementById('productFormCard');
+    card.classList.remove('hidden');
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function editProduct(product) {
@@ -359,7 +388,10 @@ function editProduct(product) {
     document.getElementById('p_stock').value = product.stock || 0;
     document.getElementById('p_product_type').value = product.product_type || 'PHYSICAL';
     document.getElementById('p_initial_keys').value = ''; 
-    document.getElementById('p_image_url').value = product.image_url || '';
+    
+    document.getElementById('p_image_url').value = ''; 
+    document.getElementById('p_image_file').value = '';
+    
     document.getElementById('p_description').value = product.description;
 
     toggleProductTypeFields();
@@ -371,14 +403,17 @@ function editProduct(product) {
         document.getElementById('imagePreviewBox').classList.add('hidden');
     }
 
-    document.getElementById('modalTitle').innerText = 'Chỉnh Sửa Sản Phẩm';
-    document.getElementById('productModal').classList.remove('hidden');
-    document.getElementById('productModal').classList.add('flex');
+    document.getElementById('formTitle').innerText = 'Chỉnh Sửa Sản Phẩm #' + product.id;
+    document.getElementById('btnToggleText').innerText = 'Đóng Bảng Form';
+
+    const card = document.getElementById('productFormCard');
+    card.classList.remove('hidden');
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function closeModal() {
-    document.getElementById('productModal').classList.add('hidden');
-    document.getElementById('productModal').classList.remove('flex');
+function closeForm() {
+    document.getElementById('productFormCard').classList.add('hidden');
+    document.getElementById('btnToggleText').innerText = 'Đăng Bài Sản Phẩm Mới';
 }
 
 function openKeyModal(productId, productName) {

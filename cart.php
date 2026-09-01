@@ -4,6 +4,11 @@ checkLogin();
 
 $user_id = $_SESSION['user_id'];
 
+// Định nghĩa mức phí ship mặc định nếu config chưa có
+if (!defined('DEFAULT_SHIPPING_FEE')) {
+    define('DEFAULT_SHIPPING_FEE', 30000);
+}
+
 // 1. XỬ LÝ LƯU HOẶC CẬP NHẬT ĐỊA CHỈ GIAO HÀNG MẶC ĐỊNH
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_address'])) {
     $saved_address = trim($_POST['saved_address']);
@@ -66,9 +71,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['checkout'])) {
     $phone          = trim($_POST['phone']);
     $address        = trim($_POST['address']);
     $payment_method = $_POST['payment_method'] ?? 'COD';
-    $total_amount   = (float)$_POST['total_amount'];
+    
+    // Tính lại subtotal và tổng tiền bao gồm cả phí ship để bảo mật tuyệt đối
+    $subtotal_checkout = 0;
+    if (!empty($_SESSION['cart'])) {
+        $ids_chk = implode(',', array_keys($_SESSION['cart']));
+        $res_chk = $conn->query("SELECT id, price FROM products WHERE id IN ($ids_chk)");
+        while ($row_c = $res_chk->fetch_assoc()) {
+            $subtotal_checkout += $row_c['price'] * $_SESSION['cart'][$row_c['id']];
+        }
+    }
+    
+    $shipping_fee   = DEFAULT_SHIPPING_FEE;
+    $total_amount   = $subtotal_checkout + $shipping_fee;
 
-    if (!empty($_SESSION['cart']) && $total_amount > 0) {
+    if (!empty($_SESSION['cart']) && $subtotal_checkout > 0) {
         
         $has_license_key = false;
 
@@ -116,8 +133,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['checkout'])) {
         // VẬT LÝ -> TRẠNG THÁI 'PENDING' (CHỜ SHIPPER)
         $initial_status = $has_license_key ? 'DELIVERED' : 'PENDING';
 
-        $stmt_order = $conn->prepare("INSERT INTO orders (customer_id, customer_name, phone, address, total_amount, payment_method, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $stmt_order->bind_param("isssdss", $user_id, $customer_name, $phone, $address, $total_amount, $payment_method, $initial_status);
+        $stmt_order = $conn->prepare("INSERT INTO orders (customer_id, customer_name, phone, address, total_amount, shipping_fee, payment_method, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt_order->bind_param("isssdiss", $user_id, $customer_name, $phone, $address, $total_amount, $shipping_fee, $payment_method, $initial_status);
         $stmt_order->execute();
         $order_id = $conn->insert_id;
 
@@ -169,6 +186,8 @@ if (!empty($_SESSION['cart'])) {
     }
 }
 
+$final_total_amount = $total_cart_amount > 0 ? ($total_cart_amount + DEFAULT_SHIPPING_FEE) : 0;
+
 include 'header.php';
 ?>
 
@@ -219,9 +238,20 @@ include 'header.php';
                     <?php endforeach; ?>
                 </div>
 
-                <div class="pt-4 border-t border-slate-100 flex justify-between items-center">
-                    <span class="text-xs sm:text-sm font-bold text-slate-500">Tổng Giá Trị Đơn Hàng:</span>
-                    <span class="text-xl sm:text-2xl font-black text-emerald-600"><?= number_format($total_cart_amount) ?> VNĐ</span>
+                <!-- Tóm tắt chi phí giỏ hàng -->
+                <div class="pt-4 border-t border-slate-100 space-y-2">
+                    <div class="flex justify-between items-center text-xs sm:text-sm text-slate-600 font-medium">
+                        <span>Tiền sản phẩm:</span>
+                        <span class="font-bold text-slate-800"><?= number_format($total_cart_amount) ?> đ</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs sm:text-sm text-slate-600 font-medium">
+                        <span>Phí vận chuyển (Shipper):</span>
+                        <span class="font-bold text-indigo-600"><?= number_format(DEFAULT_SHIPPING_FEE) ?> đ</span>
+                    </div>
+                    <div class="flex justify-between items-center pt-2 border-t border-slate-100">
+                        <span class="text-xs sm:text-sm font-bold text-slate-500">Tổng thanh toán:</span>
+                        <span class="text-xl sm:text-2xl font-black text-emerald-600"><?= number_format($final_total_amount) ?> VNĐ</span>
+                    </div>
                 </div>
             </div>
 
@@ -259,8 +289,6 @@ include 'header.php';
             </h3>
 
             <form method="POST" action="cart.php" class="space-y-4">
-                <input type="hidden" name="total_amount" value="<?= $total_cart_amount ?>">
-
                 <div>
                     <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Họ Và Tên Người Nhận</label>
                     <input type="text" name="customer_name" required value="<?= htmlspecialchars($user_info['full_name'] ?? $_SESSION['username']) ?>" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600 text-xs sm:text-sm font-medium bg-slate-50/50">

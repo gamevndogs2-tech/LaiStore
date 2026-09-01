@@ -1,8 +1,10 @@
 <?php
 require_once 'config.php';
 
-if (isset($_GET['add_to_cart'])) {
-    $p_id = (int)$_GET['add_to_cart'];
+// Xử lý thêm vào giỏ hàng qua AJAX (trả về JSON)
+if (isset($_GET['add_to_cart_ajax'])) {
+    header('Content-Type: application/json');
+    $p_id = (int)$_GET['add_to_cart_ajax'];
     
     $chk_p = $conn->prepare("SELECT name, product_type, stock FROM products WHERE id = ?");
     $chk_p->bind_param("i", $p_id);
@@ -25,12 +27,15 @@ if (isset($_GET['add_to_cart'])) {
 
         if ($current_qty < $available) {
             $_SESSION['cart'][$p_id] = $current_qty + 1;
-            header("Location: index.php?msg=added");
+            $total_cart_items = count($_SESSION['cart']);
+            echo json_encode(['status' => 'success', 'message' => 'Đã thêm vào giỏ hàng thành công!', 'cart_count' => $total_cart_items]);
         } else {
-            header("Location: index.php?msg=out_of_stock");
+            echo json_encode(['status' => 'out_of_stock', 'message' => 'Sản phẩm này đã hết hàng hoặc vượt quá số lượng tồn kho!']);
         }
         exit();
     }
+    echo json_encode(['status' => 'error', 'message' => 'Không tìm thấy sản phẩm!']);
+    exit();
 }
 
 $search = $_GET['search'] ?? '';
@@ -52,7 +57,7 @@ include 'header.php';
 <div class="relative bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl sm:rounded-3xl p-6 sm:p-12 text-white shadow-xl shadow-indigo-100 mb-6 sm:mb-10 overflow-hidden">
     <div class="relative z-10 max-w-2xl">
         <span class="bg-white/20 backdrop-blur-md text-[10px] sm:text-xs uppercase font-extrabold tracking-widest px-2.5 sm:px-3 py-1 rounded-full text-white inline-block mb-3">Mùa Mua Sắm 2026</span>
-        <h1 class="text-2xl sm:text-5xl font-black leading-tight mb-2 sm:mb-4">Trải Nghiệm Mua Sắm Đỉnh Cao Tại LaiXìTo</h1>
+        <h1 class="text-2xl sm:text-5xl font-black leading-tight mb-2 sm:mb-4">Trải Nghiệm Mua Sắm Đỉnh Cao Tại LaiStore</h1>
         <p class="text-indigo-100 text-xs sm:text-base font-medium mb-6 sm:mb-8">Khám phá hàng ngàn sản phẩm công nghệ, key bản quyền tự động chất lượng nhất.</p>
         
         <form method="GET" action="index.php" class="flex gap-1.5 sm:gap-2 bg-white p-1.5 sm:p-2 rounded-2xl shadow-lg">
@@ -67,23 +72,6 @@ include 'header.php';
     </div>
 </div>
 
-<?php if (isset($_GET['msg']) && $_GET['msg'] === 'added'): ?>
-    <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 sm:px-5 py-3.5 rounded-2xl mb-6 flex items-center justify-between font-medium text-xs sm:text-sm shadow-sm">
-        <div class="flex items-center gap-2.5">
-            <i class="fa-solid fa-circle-check text-emerald-500 text-lg sm:text-xl"></i>
-            <span>Đã thêm vào giỏ hàng thành công!</span>
-        </div>
-        <a href="cart.php" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-[11px] sm:text-xs transition whitespace-nowrap">
-            Xem Giỏ <i class="fa-solid fa-arrow-right ml-0.5"></i>
-        </a>
-    </div>
-<?php elseif (isset($_GET['msg']) && $_GET['msg'] === 'out_of_stock'): ?>
-    <div class="bg-rose-50 border border-rose-200 text-rose-800 px-4 sm:px-5 py-3.5 rounded-2xl mb-6 flex items-center gap-2.5 font-medium text-xs sm:text-sm shadow-sm">
-        <i class="fa-solid fa-triangle-exclamation text-rose-500 text-lg sm:text-xl"></i>
-        <span>Sản phẩm này đã hết hàng hoặc vượt quá số lượng tồn kho trong kho!</span>
-    </div>
-<?php endif; ?>
-
 <div class="flex items-center justify-between mb-4 sm:mb-6">
     <h2 class="text-xl sm:text-2xl font-bold text-slate-900">Sản Phẩm Nổi Bật</h2>
     <span class="text-xs sm:text-sm font-semibold text-slate-500"><?= $products->num_rows ?> sản phẩm</span>
@@ -96,7 +84,6 @@ include 'header.php';
             $display_stock = $is_license ? $row['available_keys'] : ($row['stock'] ?? 0);
             $is_out_of_stock = ($display_stock <= 0);
 
-            // Xử lý hiển thị ảnh an toàn
             $img_src = (!empty($row['image_url']) && strlen($row['image_url']) > 10) ? $row['image_url'] : 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=500';
         ?>
             <div class="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden group relative">
@@ -153,9 +140,10 @@ include 'header.php';
                                     Hết Hàng
                                 </button>
                             <?php else: ?>
-                                <a href="index.php?add_to_cart=<?= $row['id'] ?>" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 sm:py-2.5 px-2 rounded-xl text-[11px] sm:text-xs flex items-center justify-center gap-1 transition col-span-full">
+                                <!-- Nút bấm gọi Ajax thêm giỏ hàng không load lại trang -->
+                                <button onclick="addToCartAjax(<?= $row['id'] ?>)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 sm:py-2.5 px-2 rounded-xl text-[11px] sm:text-xs flex items-center justify-center gap-1 transition col-span-full">
                                     <i class="fa-solid fa-cart-plus"></i> Thêm giỏ
-                                </a>
+                                </button>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -198,9 +186,10 @@ include 'header.php';
                     <button id="chatMerchantBtn" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 sm:py-3 rounded-xl text-xs flex items-center justify-center gap-1.5 sm:gap-2 transition">
                         <i class="fa-solid fa-comments"></i> Nhắn Người Bán
                     </button>
-                    <a id="addToCartBtn" href="#" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 sm:py-3 rounded-xl text-xs flex items-center justify-center gap-1.5 sm:gap-2 transition shadow-md shadow-indigo-200">
+                    <!-- Nút thêm giỏ hàng trong modal cũng hỗ trợ Ajax -->
+                    <button id="modalAddToCartBtn" onclick="" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 sm:py-3 rounded-xl text-xs flex items-center justify-center gap-1.5 sm:gap-2 transition shadow-md shadow-indigo-200">
                         <i class="fa-solid fa-cart-plus"></i> Thêm Giỏ
-                    </a>
+                    </button>
                 </div>
             </div>
         </div>
@@ -208,6 +197,54 @@ include 'header.php';
 </div>
 
 <script>
+// Hàm xử lý Thêm vào giỏ hàng bằng Ajax (không load lại trang)
+function addToCartAjax(productId) {
+    fetch('index.php?add_to_cart_ajax=' + productId)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Hiển thị thông báo Toast góc trên màn hình
+                const Toast = Swal.mixin({
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 2000,
+                    timerProgressBar: true
+                });
+                Toast.fire({
+                    icon: 'success',
+                    title: data.message
+                });
+
+                // Tự động cập nhật lại con số trên biểu tượng giỏ hàng ở Header
+                const cartBadge = document.querySelector('a[href="cart.php"] span');
+                if (cartBadge) {
+                    cartBadge.innerText = data.cart_count;
+                    cartBadge.classList.remove('hidden');
+                } else {
+                    const cartLink = document.querySelector('a[href="cart.php"]');
+                    if (cartLink && !cartLink.querySelector('span')) {
+                        const newBadge = document.createElement('span');
+                        newBadge.className = 'absolute -top-1 right-1 bg-indigo-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full';
+                        newBadge.innerText = data.cart_count;
+                        cartLink.style.position = 'relative';
+                        cartLink.appendChild(newBadge);
+                    }
+                }
+            } else {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Thông báo',
+                    text: data.message
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Swal.fire('Lỗi', 'Không thể kết nối đến máy chủ.', 'error');
+        });
+}
+
 function openDetailModal(p) {
     document.getElementById('detail_img').src = (!empty(p.image_url) && p.image_url.length > 10) ? p.image_url : 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=500';
     document.getElementById('detail_name').innerText = p.name;
@@ -215,7 +252,9 @@ function openDetailModal(p) {
     document.getElementById('detail_price').innerText = new Intl.NumberFormat('vi-VN').format(p.price) + ' đ';
     document.getElementById('detail_merchant').innerText = p.merchant_name || 'Hệ thống LaiStore';
     document.getElementById('detail_desc').innerText = p.description || 'Chưa có mô tả chi tiết cho sản phẩm này.';
-    document.getElementById('addToCartBtn').href = 'index.php?add_to_cart=' + p.id;
+    
+    // Gắn hàm Ajax cho nút thêm giỏ hàng trong modal
+    document.getElementById('modalAddToCartBtn').setAttribute('onclick', 'addToCartAjax(' + p.id + ')');
     
     const chatBtn = document.getElementById('chatMerchantBtn');
     chatBtn.onclick = function() {

@@ -4,39 +4,61 @@ checkLogin();
 
 $user_id = $_SESSION['user_id'];
 
-// XỬ LÝ HỦY ĐƠN HÀNG
-if (isset($_GET['cancel_order_id'])) {
-    $cancel_id = (int)$_GET['cancel_order_id'];
+// XỬ LÝ HỦY ĐƠN HÀNG (Chỉ cho phép hủy khi đơn ở trạng thái PENDING)
+if (isset($_GET['cancel_id'])) {
+    $cancel_id = (int)$_GET['cancel_id'];
+    
+    // Kiểm tra xem đơn hàng có đúng của user này và đang ở trạng thái PENDING không
+    $chk_order = $conn->prepare("SELECT id, total_amount, payment_method FROM orders WHERE id = ? AND customer_id = ? AND status = 'PENDING'");
+    $chk_order->bind_param("ii", $cancel_id, $user_id);
+    $chk_order->execute();
+    $ord_res = $chk_order->get_result();
 
-    // Lấy thông tin chi tiết đơn hàng trước khi hủy
-    $stmt_check = $conn->prepare("SELECT * FROM orders WHERE id = ? AND customer_id = ? AND status = 'PENDING'");
-    $stmt_check->bind_param("ii", $cancel_id, $user_id);
-    $stmt_check->execute();
-    $order = $stmt_check->get_result()->fetch_assoc();
+    if ($ord_res->num_rows > 0) {
+        $ord_data = $ord_res->fetch_assoc();
+        
+        // Cập nhật trạng thái đơn hàng thành CANCELLED
+        $up_ord = $conn->prepare("UPDATE orders SET status = 'CANCELLED' WHERE id = ?");
+        $up_ord->bind_param("i", $cancel_id);
+        $up_ord->execute();
 
-    if ($order) {
-        // Cập nhật trạng thái đơn thành CANCELED
-        $stmt_cancel = $conn->prepare("UPDATE orders SET status = 'CANCELED' WHERE id = ?");
-        $stmt_cancel->bind_param("i", $cancel_id);
-        $stmt_cancel->execute();
-
-        // NẾU ĐƠN HÀNG ĐÃ THANH TOÁN BẰNG VÍ WALLET -> HOÀN TIỀN VÀO VÍ
-        if ($order['payment_method'] === 'WALLET') {
-            $stmt_refund = $conn->prepare("UPDATE users SET balance = balance + ? WHERE id = ?");
-            $stmt_refund->bind_param("di", $order['total_amount'], $user_id);
-            $stmt_refund->execute();
-            header("Location: orders.php?alert=canceled_refunded");
-        } else {
-            header("Location: orders.php?alert=canceled");
+        // Hoàn tiền vào ví cho khách nếu trước đó chọn thanh toán bằng ví (WALLET)
+        if (strtoupper($ord_data['payment_method']) === 'WALLET') {
+            $refund_amt = $ord_data['total_amount'];
+            $conn->query("UPDATE users SET balance = balance + $refund_amt WHERE id = $user_id");
         }
-    } else {
-        header("Location: orders.php?alert=cannot_cancel");
+
+        // Hoàn lại số lượng tồn kho hoặc key nếu cần thiết
+        $items_c = $conn->query("SELECT product_id, quantity FROM order_items WHERE order_id = $cancel_id");
+        while ($it = $items_c->fetch_assoc()) {
+            $p_id = $it['product_id'];
+            $qty = $it['quantity'];
+            $p_type_q = $conn->query("SELECT product_type FROM products WHERE id = $p_id");
+            if ($p_t = $p_type_q->fetch_assoc()) {
+                if (($p_t['product_type'] ?? 'PHYSICAL') === 'LICENSE_KEY') {
+                    $conn->query("UPDATE product_keys SET order_id = NULL, is_sold = 0 WHERE order_id = $cancel_id AND product_id = $p_id");
+                } else {
+                    $conn->query("UPDATE products SET stock = stock + $qty WHERE id = $p_id");
+                }
+            }
+        }
+
+        header("Location: orders.php?alert=cancelled");
+        exit();
     }
-    exit();
 }
 
-// Truy vấn danh sách đơn hàng của khách hàng
-$stmt = $conn->prepare("SELECT * FROM orders WHERE customer_id = ? ORDER BY id DESC");
+// Lấy danh sách đơn hàng của user hiện tại, kèm thông tin người vận chuyển (shipper)
+$sql = "SELECT o.*, u.username as shipper_name, u.phone as shipper_phone,
+               (SELECT GROUP_CONCAT(CONCAT(p.name, ' (x', oi.quantity, ')') SEPARATOR ', ') 
+                FROM order_items oi JOIN products p ON oi.product_id = p.id 
+                WHERE oi.order_id = o.id) as items_summary
+        FROM orders o 
+        LEFT JOIN users u ON o.shipper_id = u.id
+        WHERE o.customer_id = ? 
+        ORDER BY o.id DESC";
+
+$stmt = $conn->prepare($sql);
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $orders = $stmt->get_result();
@@ -46,99 +68,114 @@ include 'header.php';
 
 <div class="mb-6 sm:mb-8">
     <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900">Lịch Sử Đơn Hàng Của Tôi</h2>
-    <p class="text-slate-500 text-xs sm:text-sm mt-1">Theo dõi tiến độ, thanh toán, quản lý hủy đơn và nhận key bản quyền trực tuyến.</p>
+    <p class="text-slate-500 text-xs sm:text-sm mt-1">Theo dõi tiến độ giao hàng, mã key bản quyền và thông tin người vận chuyển trực tuyến.</p>
 </div>
 
-<!-- BẢNG ĐƠN HÀNG (CÓ CUỘN NGANG TRÊN MOBILE) -->
+<?php if (isset($_GET['alert']) && $_GET['alert'] === 'success'): ?>
+    <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 sm:px-5 py-3.5 rounded-2xl mb-6 flex items-center gap-2.5 font-medium text-xs sm:text-sm shadow-sm">
+        <i class="fa-solid fa-circle-check text-emerald-500 text-lg"></i>
+        <span>Đặt hàng thành công! Đơn hàng của bạn đã được ghi nhận.</span>
+    </div>
+<?php elseif (isset($_GET['alert']) && $_GET['alert'] === 'cancelled'): ?>
+    <!-- Đã đổi sang tông màu xanh lá (emerald) thân thiện và trực quan hơn -->
+    <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 sm:px-5 py-3.5 rounded-2xl mb-6 flex items-center gap-2.5 font-medium text-xs sm:text-sm shadow-sm">
+        <i class="fa-solid fa-circle-check text-emerald-500 text-lg"></i>
+        <span>Đã hủy đơn hàng thành công! Tiền (nếu thanh toán bằng ví) và tồn kho đã được hoàn lại.</span>
+    </div>
+<?php endif; ?>
+
 <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
     <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse min-w-[780px]">
+        <table class="w-full text-left border-collapse min-w-[900px]">
             <thead>
                 <tr class="bg-slate-50 border-b border-slate-100 text-slate-400 uppercase text-[10px] sm:text-xs font-bold">
                     <th class="p-3.5 sm:p-4">Mã Đơn</th>
-                    <th class="p-3.5 sm:p-4">Người Nhận</th>
-                    <th class="p-3.5 sm:p-4">Địa Chỉ Giao Hàng & Key</th>
-                    <th class="p-3.5 sm:p-4">Thanh Toán</th>
+                    <th class="p-3.5 sm:p-4">Sản Phẩm</th>
                     <th class="p-3.5 sm:p-4">Tổng Tiền</th>
+                    <th class="p-3.5 sm:p-4">Thanh Toán</th>
+                    <th class="p-3.5 sm:p-4">Người Vận Chuyển (Shipper)</th>
                     <th class="p-3.5 sm:p-4">Trạng Thái</th>
-                    <th class="p-3.5 sm:p-4 text-center">Thao Tác</th>
+                    <th class="p-3.5 sm:p-4 text-center">Thao Tác / Key Bản Quyền</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 text-xs sm:text-sm font-medium">
-                <?php if ($orders->num_rows > 0): ?>
-                    <?php while ($o = $orders->fetch_assoc()): 
-                        // Truy vấn lấy Key bản quyền được gán cho đơn hàng này
-                        $keys_query = $conn->prepare("
-                            SELECT pk.license_key, p.name as product_name 
-                            FROM product_keys pk 
-                            JOIN products p ON pk.product_id = p.id 
-                            WHERE pk.order_id = ?
-                        ");
-                        $keys_query->bind_param("i", $o['id']);
-                        $keys_query->execute();
-                        $assigned_keys = $keys_query->get_result();
-                    ?>
+                <?php if ($orders && $orders->num_rows > 0): ?>
+                    <?php while ($o = $orders->fetch_assoc()): ?>
                         <tr class="hover:bg-slate-50/50 transition">
-                            <td class="p-3.5 sm:p-4 font-bold text-indigo-600">#<?= $o['id'] ?></td>
-                            <td class="p-3.5 sm:p-4 font-bold text-slate-800"><?= htmlspecialchars($o['customer_name']) ?></td>
-                            <td class="p-3.5 sm:p-4 max-w-xs">
-                                <div class="font-semibold text-slate-700"><?= htmlspecialchars($o['address']) ?></div>
-                                <div class="text-[11px] text-slate-400 mt-0.5"><i class="fa-solid fa-phone mr-1"></i><?= htmlspecialchars($o['phone']) ?></div>
-
-                                <!-- HIỂN THỊ KEY BẢN QUYỀN TRỰC TUYẾN NẾU CÓ -->
-                                <?php if ($assigned_keys->num_rows > 0): ?>
-                                    <div class="mt-2.5 p-2.5 bg-indigo-50/70 border border-indigo-100 rounded-2xl">
-                                        <div class="text-[10px] font-extrabold text-indigo-600 uppercase mb-1 flex items-center gap-1">
-                                            <i class="fa-solid fa-key"></i> Key Bản Quyền Đã Nhận:
-                                        </div>
-                                        <ul class="space-y-1">
-                                            <?php while($k = $assigned_keys->fetch_assoc()): ?>
-                                                <li class="text-[11px] text-slate-700 font-medium">
-                                                    <span class="font-bold text-slate-900"><?= htmlspecialchars($k['product_name']) ?>:</span> 
-                                                    <code class="bg-white px-2 py-0.5 rounded border border-indigo-200 text-indigo-700 font-mono select-all font-bold"><?= htmlspecialchars($k['license_key']) ?></code>
-                                                </li>
-                                            <?php endwhile; ?>
-                                        </ul>
-                                    </div>
-                                <?php endif; ?>
-                            </td>
-
-                            <td class="p-3.5 sm:p-4">
-                                <?php if ($o['payment_method'] === 'WALLET'): ?>
-                                    <span class="bg-indigo-50 text-indigo-600 border border-indigo-200/60 px-2.5 py-0.5 rounded-lg text-[10px] sm:text-xs font-extrabold"><i class="fa-solid fa-wallet mr-1"></i>Ví Wallet</span>
-                                <?php else: ?>
-                                    <span class="bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-0.5 rounded-lg text-[10px] sm:text-xs font-extrabold"><i class="fa-solid fa-money-bill-wave mr-1"></i>COD</span>
-                                <?php endif; ?>
-                            </td>
-
-                            <td class="p-3.5 sm:p-4 font-extrabold text-emerald-600 whitespace-nowrap"><?= number_format($o['total_amount']) ?> đ</td>
+                            <td class="p-3.5 sm:p-4 font-black text-indigo-600">#<?= $o['id'] ?></td>
                             
+                            <td class="p-3.5 sm:p-4 text-slate-800 font-bold max-w-xs">
+                                <div><?= htmlspecialchars($o['items_summary'] ?? 'Sản phẩm kỹ thuật số') ?></div>
+                                <div class="text-[10px] text-slate-400 font-normal mt-0.5">Nhận: <?= htmlspecialchars($o['customer_name']) ?> (<?= htmlspecialchars($o['phone']) ?>)</div>
+                            </td>
+
+                            <td class="p-3.5 sm:p-4 text-emerald-600 font-extrabold whitespace-nowrap">
+                                <?= number_format($o['total_amount']) ?> đ
+                            </td>
+
                             <td class="p-3.5 sm:p-4">
-                                <?php if ($o['status'] === 'PENDING'): ?>
-                                    <span class="bg-amber-50 text-amber-600 border border-amber-200/60 px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-bold inline-flex items-center gap-1 whitespace-nowrap"><i class="fa-solid fa-clock"></i> Chờ Tiếp Nhận</span>
-                                <?php elseif ($o['status'] === 'SHIPPING'): ?>
-                                    <span class="bg-sky-50 text-sky-600 border border-sky-200/60 px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-bold inline-flex items-center gap-1 whitespace-nowrap"><i class="fa-solid fa-truck-fast"></i> Đang Giao</span>
-                                <?php elseif ($o['status'] === 'DELIVERED'): ?>
-                                    <span class="bg-emerald-50 text-emerald-600 border border-emerald-200/60 px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-bold inline-flex items-center gap-1 whitespace-nowrap"><i class="fa-solid fa-circle-check"></i> Đã Giao</span>
+                                <span class="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase">
+                                    <?= $o['payment_method'] ?>
+                                </span>
+                            </td>
+
+                            <td class="p-3.5 sm:p-4">
+                                <?php if (!empty($o['shipper_name'])): ?>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-7 h-7 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center font-bold text-xs">
+                                            <i class="fa-solid fa-truck-fast"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-extrabold text-slate-800"><?= htmlspecialchars($o['shipper_name']) ?></div>
+                                            <?php if (!empty($o['shipper_phone'])): ?>
+                                                <div class="text-[10px] text-slate-500 font-bold"><i class="fa-solid fa-phone mr-0.5"></i><?= htmlspecialchars($o['shipper_phone']) ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
                                 <?php else: ?>
-                                    <span class="bg-rose-50 text-rose-600 border border-rose-200/60 px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-bold inline-flex items-center gap-1 whitespace-nowrap"><i class="fa-solid fa-ban"></i> Đã Hủy</span>
+                                    <span class="text-slate-400 italic text-xs">Hệ thống đang phân công...</span>
                                 <?php endif; ?>
+                            </td>
+
+                            <td class="p-3.5 sm:p-4">
+                                <?php 
+                                    $status = $o['status'];
+                                    $badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
+                                    $statusText = 'Chờ xử lý';
+                                    if ($status === 'SHIPPING') {
+                                        $badgeClass = 'bg-sky-50 text-sky-700 border-sky-200';
+                                        $statusText = 'Đang giao hàng';
+                                    } elseif ($status === 'DELIVERED') {
+                                        $badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                                        $statusText = 'Đã hoàn tất';
+                                    } elseif ($status === 'CANCELLED') {
+                                        $badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
+                                        $statusText = 'Đã hủy';
+                                    }
+                                ?>
+                                <span class="border px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-black uppercase <?= $badgeClass ?>">
+                                    <?= $statusText ?>
+                                </span>
                             </td>
 
                             <td class="p-3.5 sm:p-4 text-center">
-                                <?php if ($o['status'] === 'PENDING'): ?>
-                                    <button onclick="confirmCancelOrder(<?= $o['id'] ?>)" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition inline-flex items-center gap-1 mx-auto whitespace-nowrap">
-                                        <i class="fa-solid fa-xmark"></i> Hủy Đơn
+                                <div class="flex items-center justify-center gap-1.5">
+                                    <?php if ($o['status'] === 'PENDING'): ?>
+                                        <a href="javascript:void(0)" onclick="confirmCancelOrder(<?= $o['id'] ?>)" class="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold px-3 py-1.5 rounded-xl text-xs transition inline-flex items-center gap-1 whitespace-nowrap">
+                                            <i class="fa-solid fa-ban"></i> Hủy Đơn
+                                        </a>
+                                    <?php endif; ?>
+                                    
+                                    <button onclick="openOrderKeys(<?= $o['id'] ?>)" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold px-3 py-1.5 rounded-xl text-xs transition inline-flex items-center gap-1.5 whitespace-nowrap">
+                                        <i class="fa-solid fa-key"></i> Xem Key / Chi Tiết
                                     </button>
-                                <?php else: ?>
-                                    <span class="text-xs text-slate-300 italic font-semibold">Không thể hủy</span>
-                                <?php endif; ?>
+                                </div>
                             </td>
                         </tr>
                     <?php endwhile; ?>
                 <?php else: ?>
                     <tr>
-                        <td colspan="7" class="p-8 text-center text-slate-400 text-xs sm:text-sm">Bạn chưa có đơn hàng nào. <a href="index.php" class="text-indigo-600 font-bold underline">Mua sắm ngay</a>!</td>
+                        <td colspan="7" class="p-10 text-center text-slate-400 text-xs sm:text-sm">Bạn chưa có đơn hàng nào trong lịch sử.</td>
                     </tr>
                 <?php endif; ?>
             </tbody>
@@ -146,34 +183,59 @@ include 'header.php';
     </div>
 </div>
 
+<!-- MODAL XEM CHI TIẾT KEY BẢN QUYỀN TRONG ĐƠN -->
+<div id="orderKeyModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900"><i class="fa-solid fa-key text-indigo-600 mr-1"></i> Chi Tiết Key Bản Quyền Đơn Hàng</h3>
+            <button onclick="closeOrderKeyModal()" class="text-slate-400 hover:text-slate-600 text-lg w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div id="orderKeyContent" class="space-y-2 text-xs">
+            <span class="text-slate-400 italic">Đang tải thông tin...</span>
+        </div>
+    </div>
+</div>
+
 <script>
-function confirmCancelOrder(id) {
+function confirmCancelOrder(orderId) {
     Swal.fire({
-        title: 'Hủy đơn hàng này?',
-        text: "Bạn có chắc chắn muốn hủy đơn hàng không?",
+        title: 'Xác nhận hủy đơn hàng #' + orderId + '?',
+        text: "Đơn hàng sẽ bị hủy, số lượng tồn kho và tiền thanh toán (nếu dùng ví) sẽ được hoàn trả!",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
         cancelButtonColor: '#64748b',
         confirmButtonText: 'Đồng ý hủy',
-        cancelButtonText: 'Quay lại'
+        cancelButtonText: 'Không'
     }).then((result) => {
         if (result.isConfirmed) {
-            window.location.href = 'orders.php?cancel_order_id=' + id;
+            window.location.href = 'orders.php?cancel_id=' + orderId;
         }
-    });
+    })
 }
 
-const urlParams = new URLSearchParams(window.location.search);
-const alertType = urlParams.get('alert');
-if (alertType === 'canceled_refunded') {
-    Swal.fire('Đã Hủy Đơn!', 'Đơn hàng đã được hủy và số tiền đã được HOÀN 100% vào Ví LaiStore Wallet của bạn!', 'success');
-} else if (alertType === 'canceled') {
-    Swal.fire('Đã Hủy Đơn!', 'Đơn hàng của bạn đã được hủy thành công!', 'info');
-} else if (alertType === 'cannot_cancel') {
-    Swal.fire('Thất Bại!', 'Đơn hàng đang giao hoặc đã hủy từ trước nên không thể thực hiện thao tác!', 'error');
-} else if (urlParams.get('alert') === 'success' || urlParams.get('msg') === 'success') {
-    Swal.fire('Đặt Hàng Thành Công!', 'Đơn hàng đã được ghi nhận và key bản quyền đã được cấp tự động (nếu có)!', 'success');
+function openOrderKeys(orderId) {
+    const modal = document.getElementById('orderKeyModal');
+    const content = document.getElementById('orderKeyContent');
+    content.innerHTML = '<span class="text-slate-400 italic">Đang tải thông tin...</span>';
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    fetch('get_order_keys.php?order_id=' + orderId)
+        .then(res => res.text())
+        .then(html => {
+            content.innerHTML = html;
+        })
+        .catch(err => {
+            content.innerHTML = '<span class="text-rose-500">Không thể tải dữ liệu key cho đơn hàng này.</span>';
+        });
+}
+
+function closeOrderKeyModal() {
+    const modal = document.getElementById('orderKeyModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
 }
 </script>
 

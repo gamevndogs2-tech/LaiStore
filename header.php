@@ -44,8 +44,9 @@ if (isset($_SESSION['user_id'])) {
             <span>LaiStore</span>
         </a>
 
-        <!-- Navigation Links (Hiển thị ngang trên Desktop) -->
+        <!-- Navigation Links -->
         <nav class="flex items-center gap-2 sm:gap-4">
+            <!-- Trang chủ & Đơn hàng chỉ hiện trên desktop, mobile đã có menu dưới footer -->
             <a href="index.php" class="hidden md:flex text-xs sm:text-sm font-semibold text-slate-600 hover:text-indigo-600 transition items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-slate-100/60">
                 <i class="fa-solid fa-house"></i> Trang Chủ
             </a>
@@ -63,7 +64,7 @@ if (isset($_SESSION['user_id'])) {
                     </a>
                 <?php endif; ?>
 
-                <!-- Nút Giỏ Hàng Ngang (Desktop & Mobile) -->
+                <!-- Nút Giỏ Hàng -->
                 <a href="cart.php" class="relative flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-600 hover:text-indigo-600 transition px-3 py-2 rounded-xl hover:bg-slate-100/60">
                     <i class="fa-solid fa-cart-shopping text-base"></i>
                     <span class="hidden md:inline">Giỏ Hàng</span>
@@ -72,15 +73,17 @@ if (isset($_SESSION['user_id'])) {
                     <?php endif; ?>
                 </a>
                 
-                <!-- DROPDOWN MENU TÀI KHOẢN -->
+                <!-- DROPDOWN MENU TÀI KHOẢN (Hiển thị icon hình người + tên người dùng trên mobile) -->
                 <div class="relative ml-1">
                     <button onclick="toggleUserMenu()" class="flex items-center gap-2 bg-slate-100 hover:bg-slate-200/80 px-2.5 sm:px-3.5 py-1.5 rounded-2xl transition focus:outline-none border border-slate-200">
+                        <!-- Icon hình người thay cho chữ cái đầu trên mobile, desktop vẫn giữ gọn hoặc dùng chung -->
                         <div class="w-7 h-7 sm:w-8 sm:h-8 bg-indigo-600 text-white rounded-xl flex items-center justify-center text-xs font-bold shadow-md shadow-indigo-200">
-                            <?= strtoupper(substr($_SESSION['username'], 0, 1)) ?>
+                            <i class="fa-solid fa-user"></i>
                         </div>
 
-                        <div class="text-left hidden xs:block">
-                            <div class="text-[11px] sm:text-xs font-extrabold text-slate-800 leading-tight max-w-[90px] truncate">
+                        <!-- Hiển thị tên người dùng luôn cả trên mobile -->
+                        <div class="text-left block">
+                            <div class="text-[11px] sm:text-xs font-extrabold text-slate-800 leading-tight max-w-[110px] truncate">
                                 <?= htmlspecialchars($_SESSION['username']) ?>
                             </div>
                             <div class="text-[9px] sm:text-[10px] font-black text-emerald-600 flex items-center gap-0.5">
